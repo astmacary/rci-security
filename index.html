@@ -337,7 +337,7 @@ const CONFIG = {
 
 const onAppHost = !CONFIG.appHosts || CONFIG.appHosts.some(h => h.startsWith(".") ? location.hostname.endsWith(h) : location.hostname === h);
 // Bump together with CACHE in sw.js whenever the app changes.
-const APP_VERSION = "12";
+const APP_VERSION = "13";
 const DEMO = !CONFIG.clientId || /[?&]demo\b/.test(location.search) || !onAppHost;
 const SCOPES = ["User.Read", "User.ReadBasic.All", "Sites.ReadWrite.All"];
 
@@ -1014,7 +1014,7 @@ function viewDirectory(){
   const people = S.items.filter(p => isProfile(p) && p.editable).sort((a,b) => (a.fullName||"").localeCompare(b.fullName||""));
   return `<div class="page-h"><h1>Team Directory</h1></div>
     <p class="sub" style="margin-top:-10px">${people.length} team members</p>
-    ${people.length ? `<div class="roster four">${people.map(p => tile(p, p.phone || "", "member", p.id)).join("")}</div>` : `<div class="empty">No one is in the Roster yet.</div>`}`;
+    ${people.length ? `<div class="roster four">${people.map(p => tile(p, "", "member", p.id)).join("")}</div>` : `<div class="empty">No one is in the Roster yet.</div>`}`;
 }
 
 /* Profile card + edit form used by both a teammate's page and My Profile.
