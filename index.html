@@ -112,6 +112,34 @@ a.btn{text-decoration:none}
 .no-service{display:flex;align-items:center;gap:8px;background:var(--bad-soft);color:var(--bad);border:1px solid var(--bad);border-radius:var(--r);padding:10px 14px;font-weight:700;margin-bottom:10px}
 .bday-msg{margin:0;font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.02em;text-align:center}
 .iconbtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.date-chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:thin}
+.date-chip{flex:none;display:flex;flex-direction:column;align-items:center;min-width:54px;padding:6px 4px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.date-chip b{font-size:20px;line-height:1.1;letter-spacing:0}
+.date-chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.admin-row{display:flex;flex-direction:column;gap:6px;padding:10px 12px}
+.admin-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.admin-who{display:flex;align-items:center;gap:10px;min-width:0}
+.admin-title{display:flex;flex-direction:column;gap:1px;min-width:0}
+.admin-title b{font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+.admin-title .sub{font-size:13px}
+.admin-side{display:flex;flex-direction:row;align-items:center;gap:6px;flex:none}
+.admin-side .iconbtn{width:30px;height:30px}
+.admin-side .iconbtn svg{width:15px;height:15px}
+.admin-top .pill{flex:none}
+.save-btn:disabled{opacity:.35;cursor:default}
+.save-btn:not(:disabled){background:var(--accent);color:var(--accent-ink)}
+.save-btn.busy{opacity:.6}
+.admin-row.locked select{opacity:.55}
+.admin-row.locked .av{opacity:.7}
+.av.face{width:36px;height:36px;font-size:12px}
+.inline-check{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--accent);background:transparent;color:var(--accent);vertical-align:-5px;box-sizing:border-box}
+.inline-check svg{width:12px;height:12px}
+ol.steps{margin:-6px 0 0;padding:12px 16px 12px 36px;display:flex;flex-direction:column;gap:4px}
+ol.steps li{padding-left:2px}
+.admin-grid{display:grid;grid-template-columns:1fr;gap:6px}
+.admin-grid .field{gap:3px}
+.admin-grid select{padding:7px 10px;min-height:38px;font-size:14px}
+.admin-grid label{font-size:12.5px}
 .ann-meta{color:var(--muted);font-size:12.5px;font-weight:500}
 .ann-form{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .announce .thanks{margin-top:8px;font-weight:600}
@@ -291,8 +319,8 @@ const CONFIG = {
   messagesListName: "Birthday Messages",
   announcementsListId: "",
   messagesListId: "",
-  // Only these sign-ins see the controls to add and remove Home-screen announcements.
-  announcementEditors: ["delisa.rogers@therampchurch.com", "hal.hanson@therampchurch.com", "halrhansonjr@gmail.com",
+  // Admins: only these sign-ins can edit Home-screen announcements and use Edit Schedule (My Profile → Admin).
+  editors: ["delisa.rogers@therampchurch.com", "hal.hanson@therampchurch.com", "halrhansonjr@gmail.com",
     "lee.gilbert@therampchurch.com", "gilbertwilfred7@gmail.com", "ashley.stmacary@therampchurch.com"],
   wallDays: 30,                    // birthday wall: open for posting and visible for this many days
   guidelinesUrl: ""                // optional link shown under announcements
@@ -379,7 +407,8 @@ function normalize(id, f, emailById){
     birthday: f.Birthday ? (/^\d{4}-\d{2}-\d{2}$/.test(f.Birthday) ? f.Birthday : spDate(f.Birthday)) : "",
     phone: f.PhoneNumber || "",
     photoRaw: typeof f.Photo === "string" ? f.Photo : (f.Photo ? JSON.stringify(f.Photo) : ""),
-    editable: roster
+    editable: roster,
+    archived: lc(f.ArchiveStatus) === "archive"
   };
 }
 /* Anyone on the schedule without a Roster row still gets a (read-only) directory entry from their schedule rows. */
@@ -451,18 +480,19 @@ const LiveAPI = {
       const users = await this.all(`${base}/${encodeURIComponent("User Information List")}/items?$expand=fields($select=EMail,UserName,Title)&$top=999`);
       users.forEach(u => { emailById[u.id] = u.fields.EMail || u.fields.UserName || ""; });
     } catch(e){ console.warn("Could not read User Information List; matching by name instead.", e); }
-    const sel = "ServiceDate,NameLookupId,SecurityName,Placement,Status,ServiceCategory,CallTime,PhoneNumber,Birthday,Photo";
+    const sel = "ServiceDate,NameLookupId,SecurityName,Placement,Status,ServiceCategory,CallTime,PhoneNumber,Birthday,Photo,ArchiveStatus";
     const rows = await this.all(`${base}/${CONFIG.listId}/items?$expand=fields($select=${sel})&$top=500`);
-    let names = [], servingChoices = [];
+    let names = [], servingChoices = [], placements = [];
     try {
       const cols = await this.g(`${base}/${CONFIG.listId}/columns?$select=name,choice`);
       names = (cols.value.find(c => c.name === "ChoiceNames")?.choice?.choices) || [];
       servingChoices = (cols.value.find(c => c.name === "Serving")?.choice?.choices) || [];
+      placements = (cols.value.find(c => c.name === "Placement")?.choice?.choices) || [];
     } catch(e){}
     return {
       me: { name: me.displayName || this.account.name || "", emails: [me.mail, me.userPrincipalName, this.account.username].filter(Boolean).map(lc) },
       items: (list => list.concat(buildPeople(list)))(rows.map(r => normalize(r.id, r.fields, emailById))),
-      names, servingChoices,
+      names, servingChoices, placements,
       messages: await this.messages(),
       announcements: await this.announcements()
     };
@@ -607,7 +637,8 @@ const DemoAPI = {
       { id: 1, text: "There is no Bible Study on Wednesday, October 21st.", until: "2026-10-21" },
       { id: 2, text: "On Sunday, November 1st, we are going to Reach Out Tabernacle. There is no Sunday morning service at The Ramp.", until: "2026-11-01", flyer: "demo" }
     ];
-    return { me: { name: people[0][0], emails: [people[0][1]] }, items, names: people.map(p=>p[0]), servingChoices: [], announcements, messages: [] };
+    return { me: { name: people[0][0], emails: [people[0][1]] }, items, names: people.map(p=>p[0]), servingChoices: [], announcements, messages: [],
+      placements: ["Main Lobby","Aisle 0/1 (Left Front Wall)","Aisle 2","Aisle 3","Aisle 4 (Right Front Wall)","Guest Lobby","Balcony","Floater","Pastor's Door","Pastor/Adjutant/Middle Aisle","N/A","--"] };
   },
   async update(id, fields){
     await new Promise(r => setTimeout(r, 250));
@@ -805,7 +836,8 @@ function cue(i, opts={}){
 }
 
 const annEditing = () => !!S.annEdit && canEditAnns();
-const canEditAnns = () => DEMO || (S.me?.emails || []).some(e => CONFIG.announcementEditors.map(lc).includes(lc(e)));
+const isEditor = () => DEMO || (S.me?.emails || []).some(e => CONFIG.editors.map(lc).includes(lc(e)));
+const canEditAnns = () => DEMO || (S.me?.emails || []).some(e => CONFIG.editors.map(lc).includes(lc(e)));
 function viewHome(){
   const t = todayKey(), wk = addDays(t, 7);
   const pend = assignments().filter(i => mine(i) && pending(i) && i.date >= t).sort(byDate);
@@ -874,7 +906,8 @@ function viewCalendar(){
         <button class="iconbtn" data-act="cal-next" aria-label="Next month">${ICON.next}</button></div>
       <div class="grid7">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(x=>`<div class="dowh">${x}</div>`).join("")}${cells}</div>
     </section>
-    <section><div class="day-h"><h2 class="section-label">${esc(fmtLong(sel))}${cats.length ? ` <span class="day-cat">${esc(cats.join(" / "))}</span>` : ""}</h2></div>
+    <section><div class="day-h"><h2 class="section-label">${esc(fmtLong(sel))}${cats.length ? ` <span class="day-cat">${esc(cats.join(" / "))}</span>` : ""}</h2>
+        ${isEditor() && adminRows().some(i => i.date === sel) ? `<button class="iconbtn notes-btn" data-act="admin-open" data-date="${sel}" aria-label="Edit this day's schedule" title="Edit schedule">${ICON.pencil}</button>` : ""}</div>
       ${bdayRows ? `<div class="panel daylist" style="margin-bottom:10px">${bdayRows}</div>` : ""}
       ${team ? `<div class="panel daylist">${team}</div>` : (bdayRows ? "" : `<div class="empty">No events scheduled.</div>`)}
     </section>`;
@@ -994,8 +1027,53 @@ function personEditor(p){
 function viewProfile(){
   const p = myProfile();
   const head = `<div class="page-h"><h1>My Profile</h1><span style="flex:1"></span><button class="btn" data-act="signout">${ICON.out.replace("<svg",'<svg width="16" height="16"')}Sign Out</button></div>`;
-  if (!p) return `${head}<section class="panel profile-hero">${avatar({fullName:S.me.name, email:S.me.emails[0]}, "lg")}<h2>${esc(S.me.name)}</h2><span class="sub email-addr">${esc(S.me.emails[0] || "")}</span></section>${noProfileMsg()}${badgePanel()}${installPanel()}`;
-  return `${head}${personEditor(p)}${badgePanel()}${installPanel()}`;
+  if (!p) return `${head}<section class="panel profile-hero">${avatar({fullName:S.me.name, email:S.me.emails[0]}, "lg")}<h2>${esc(S.me.name)}</h2><span class="sub email-addr">${esc(S.me.emails[0] || "")}</span></section>${noProfileMsg()}${adminPanel()}${badgePanel()}${installPanel()}`;
+  return `${head}${personEditor(p)}${adminPanel()}${badgePanel()}${installPanel()}`;
+}
+
+/* ================= EDIT SCHEDULE (admins only) =================
+   Mirrors the SharePoint "Admin" view: Archive Status = Active, Service Date today or later, by date.
+   Shows Service Date, Service Category and Security Name; admins change Placement. */
+function adminPanel(){
+  return isEditor() ? `<section class="panel install"><h2 class="section-label" style="margin:0">Admin</h2><p>Set placements on the upcoming Security schedule.</p><button class="btn blue" data-act="admin-open">${ICON.cal.replace("<svg",'<svg width="16" height="16"')}Edit Schedule</button></section>` : "";
+}
+const adminRows = () => { const t = todayKey(); return S.items.filter(i => !isProfile(i) && i.date && i.date >= t && !i.archived); };
+function adminDates(){ return [...new Set(adminRows().map(i => i.date))].sort(); }
+function opts(list, cur, blank){
+  const all = [...new Set([...(list || []), ...(cur ? [cur] : [])])];
+  return (blank ? `<option value="">${blank}</option>` : "") + all.map(v => `<option ${v === cur ? "selected" : ""}>${esc(v)}</option>`).join("");
+}
+function saveIcon(){ return `<button class="iconbtn notes-btn save-btn" type="submit" disabled aria-label="Save changes" title="Save changes">${ICON.check}</button>`; }
+function viewAdmin(){
+  if (!isEditor()) return `${backBar("Edit Schedule")}<div class="empty">Only schedule admins can edit the schedule.</div>`;
+  const dates = adminDates();
+  if (!dates.length) return `${backBar("Edit Schedule")}<div class="empty">There's nothing on the schedule from today on.</div>`;
+  if (!S.adminDate || !dates.includes(S.adminDate)) S.adminDate = dates.find(d => d >= S.adminDate) || dates[0];
+  const k = S.adminDate;
+  const rows = adminRows().filter(i => i.date === k).sort((x, y) => Number(x.id) - Number(y.id));   // same order as the SharePoint list
+  const chips = dates.map(d => { const x = fromKey(d); return `<button class="date-chip ${d === k ? "on" : ""}" data-act="admin-date" data-date="${d}" aria-pressed="${d === k}"><span>${x.toLocaleDateString(undefined,{weekday:"short"})}</span><b>${x.getDate()}</b><span>${x.toLocaleDateString(undefined,{month:"short"})}</span></button>`; }).join("");
+  const cards = rows.map(i => {
+    const sid = esc(i.id);
+    const locked = lc(i.status) === "accepted" && !(S.adminUnlocked || new Set()).has(i.id);
+    const prof = profileOf(i);
+    return `<form class="panel admin-row ${locked ? "locked" : ""}" data-id="${sid}">
+      <div class="admin-top">
+        <div class="admin-who">${avatar(prof || i, "face")}<div class="admin-title"><b>${esc(i.fullName || "No name")}</b><span class="sub" style="margin:0">${esc([i.category, fmtShort(i.date)].filter(Boolean).join(" · "))}</span></div></div>
+        <div class="admin-side">${statusPill(i)}${locked
+          ? `<button class="iconbtn notes-btn" type="button" data-act="admin-unlock" data-id="${sid}" aria-label="Edit this placement" title="Edit">${ICON.pencil}</button>`
+          : saveIcon()}</div>
+      </div>
+      <div class="admin-grid">
+        <div class="field wide"><label for="ad-pl-${sid}">Placement</label><select id="ad-pl-${sid}" data-f="Placement" ${locked ? "disabled" : ""}>${opts(S.placements, i.role, "—")}</select></div>
+      </div>
+    </form>`;
+  }).join("");
+  return `${backBar("Edit Schedule")}
+    <ol class="panel steps"><li>Choose a placement from the drop down menu.</li><li>Hit the <span class="inline-check" aria-label="check">${ICON.check}</span> to save.</li></ol>
+    <div class="date-chips" role="group" aria-label="Service dates">${chips}</div>
+    <h2 class="section-label" style="margin:4px 0 0">${esc(fmtLong(k))}</h2>
+    <p class="sub" style="margin:-4px 0 0">${rows.length} ${rows.length === 1 ? "person" : "people"} scheduled</p>
+    <div class="list">${cards}</div>`;
 }
 
 /* ---------- red badge on the app icon for pending requests ---------- */
@@ -1046,8 +1124,8 @@ function render(){
     app.innerHTML = header + `<main><div class="wrap">${body}</div></main>`;
     return;
   }
-  const views = { directory: viewDirectory, home: viewHome, schedule: viewSchedule, calendar: viewCalendar, team: viewTeam, member: viewMember, absence: viewAbsence, profile: viewProfile };
-  const active = ["team","member"].includes(S.view) ? (S.stack[0]?.view || "home") : S.view;
+  const views = { admin: viewAdmin, directory: viewDirectory, home: viewHome, schedule: viewSchedule, calendar: viewCalendar, team: viewTeam, member: viewMember, absence: viewAbsence, profile: viewProfile };
+  const active = ["team","member","admin"].includes(S.view) ? (S.stack[0]?.view || "home") : S.view;
   const demoBar = DEMO ? `<div class="demo"><span><strong>Demo mode.</strong> Sample people and dates; nothing is saved to SharePoint. Open it from the app's official link to connect the Security Schedule list.</span></div>` : "";
   app.innerHTML = header + `<main><div class="wrap">${demoBar}${views[S.view]()}</div></main>
     <nav class="tabs" aria-label="Main"><div class="wrap">${TABS.map(([v,l,ic]) => `<button data-act="tab" data-view="${v}" ${v===active?'aria-current="page"':""}>${ic}<span>${l}</span></button>`).join("")}</div></nav>`;
@@ -1103,6 +1181,16 @@ document.addEventListener("click", async e => {
     case "badge-on": try { const r = await Notification.requestPermission(); if (r === "granted"){ updateBadge(); toast("App badge turned on"); } } catch(err){} render(); break;
     case "wall": go("member", b.dataset.id); requestAnimationFrame(() => { const w = document.getElementById("wall"); if (w) w.scrollIntoView({ block: "start", behavior: "smooth" }); }); break;
     case "msg-ask": S.confirmMsg = b.dataset.id; render(); break;
+    case "admin-open": if (b.dataset.date) S.adminDate = b.dataset.date; go("admin"); break;
+    case "admin-date": S.adminDate = b.dataset.date; render(); document.querySelector(`[data-act="admin-date"][data-date="${S.adminDate}"]`)?.scrollIntoView({ inline: "center", block: "nearest" }); break;
+    case "admin-unlock": {
+      const row = b.closest(".admin-row");
+      (S.adminUnlocked = S.adminUnlocked || new Set()).add(b.dataset.id);
+      row.classList.remove("locked");
+      row.querySelectorAll("select").forEach(x => x.disabled = false);
+      b.outerHTML = saveIcon();
+      row.querySelector("select")?.focus(); break;
+    }
     case "ann-edit": if (canEditAnns()){ S.annEdit = !S.annEdit; S.confirmAnn = null; render(); } break;
     case "ann-ask": S.confirmAnn = Number(b.dataset.id); render(); break;
     case "ann-keep": S.confirmAnn = null; render(); break;
@@ -1147,6 +1235,24 @@ document.addEventListener("submit", async e => {
       p.timeOff = dates[0]; p.notes = html; A.sent = dates; A.notes = ""; S.absenceDone = true; render();
     } catch(err){ toast("Couldn't submit your absence. " + err.message, true); btn.disabled = false; btn.textContent = "Submit Absence"; }
   }
+  if (e.target.classList.contains("admin-row")){
+    if (!isEditor()) return;
+    const item = S.items.find(i => i.id === e.target.dataset.id); if (!item) return;
+    const placement = e.target.querySelector('[data-f="Placement"]').value;
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (placement === item.role){ btn.disabled = true; return; }
+    // Like the Productions app: a changed placement goes back to Pending, so the person confirms again.
+    const fields = { Placement: placement || null };
+    if (lc(item.status) !== "pending") fields.Status = "Pending";
+    btn.disabled = true; btn.classList.add("busy");
+    try {
+      await API.update(item.id, fields);
+      item.role = placement; item.status = "Pending";
+      S.adminUnlocked?.delete(item.id);
+      toast(`Saved: ${item.fullName}, ${placement || "no placement"}, ${fmtShort(item.date)}`); render(); updateBadge();
+    } catch(err){ toast("Couldn't save the change. " + err.message, true); btn.disabled = false; btn.classList.remove("busy"); }
+    return;
+  }
   if (e.target.id === "annForm"){
     if (!canEditAnns()) return;
     const text = $("#ann-text").value.trim(), until = $("#ann-until").value;
@@ -1179,6 +1285,8 @@ document.addEventListener("submit", async e => {
 document.addEventListener("input", e => { if (e.target.id === "ab-notes") absState().notes = e.target.value; });
 
 document.addEventListener("change", async e => {
+  const adRow = e.target.closest(".admin-row");
+  if (adRow){ adRow.querySelector('button[type="submit"]').disabled = false; return; }
   if (e.target.id !== "pf-photo" || !e.target.files[0]) return;
   const p = S.items.find(i => i.id === e.target.dataset.id); if (!p || !p.editable) return;
   toast("Uploading photo…");
@@ -1200,7 +1308,7 @@ async function start(){
     const signedIn = await API.init();
     if (!signedIn){ S.phase = "signin"; render(); return; }
     const data = await API.load();
-    S.me = data.me; S.items = data.items; S.names = data.names; S.servingChoices = data.servingChoices || []; S.announcements = data.announcements || []; S.messages = data.messages || [];
+    S.me = data.me; S.items = data.items; S.names = data.names; S.servingChoices = data.servingChoices || []; S.placements = data.placements || []; S.announcements = data.announcements || []; S.messages = data.messages || [];
     const t = new Date(); S.cal.month = new Date(t.getFullYear(), t.getMonth(), 1); S.cal.sel = todayKey();
     S.phase = "ready"; render(); maybeConfetti(); updateBadge();
   } catch(e){
