@@ -211,6 +211,15 @@ ol.steps li{padding-left:2px}
 .tile .meta{padding:8px 10px 10px;min-width:0;display:flex;flex-direction:column;gap:2px}
 .tile .meta b{font-weight:700;font-size:13.5px;line-height:1.25;overflow-wrap:anywhere}
 .tile .meta small{color:var(--muted);font-size:12.5px;line-height:1.3}
+/* Header photo: red dot when you have pending requests */
+.me-btn{position:relative;padding:0;border:none;width:50px;height:50px;overflow:visible}
+.red-dot{position:absolute;top:0;right:0;width:14px;height:14px;border-radius:50%;background:var(--stop);border:2px solid var(--surface)}
+/* Team directory: always 4 smaller tiles per row */
+.roster.four{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.roster.four .tile .av{font-size:18px}
+.roster.four .tile .meta{padding:5px 6px 7px;gap:1px}
+.roster.four .tile .meta b{font-size:11.5px;line-height:1.2}
+.roster.four .tile .meta small{font-size:10px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
 /* People rows */
 .person{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;width:100%;text-align:left}
 .person .meta{min-width:0;flex:1}
@@ -328,7 +337,7 @@ const CONFIG = {
 
 const onAppHost = !CONFIG.appHosts || CONFIG.appHosts.some(h => h.startsWith(".") ? location.hostname.endsWith(h) : location.hostname === h);
 // Bump together with CACHE in sw.js whenever the app changes.
-const APP_VERSION = "11";
+const APP_VERSION = "12";
 const DEMO = !CONFIG.clientId || /[?&]demo\b/.test(location.search) || !onAppHost;
 const SCOPES = ["User.Read", "User.ReadBasic.All", "Sites.ReadWrite.All"];
 
@@ -1005,7 +1014,7 @@ function viewDirectory(){
   const people = S.items.filter(p => isProfile(p) && p.editable).sort((a,b) => (a.fullName||"").localeCompare(b.fullName||""));
   return `<div class="page-h"><h1>Team Directory</h1></div>
     <p class="sub" style="margin-top:-10px">${people.length} team members</p>
-    ${people.length ? `<div class="roster">${people.map(p => tile(p, p.phone || "", "member", p.id)).join("")}</div>` : `<div class="empty">No one is in the Roster yet.</div>`}`;
+    ${people.length ? `<div class="roster four">${people.map(p => tile(p, p.phone || "", "member", p.id)).join("")}</div>` : `<div class="empty">No one is in the Roster yet.</div>`}`;
 }
 
 /* Profile card + edit form used by both a teammate's page and My Profile.
@@ -1117,7 +1126,7 @@ function render(){
   const app = $("#app");
   const themeBtn = `<button class="iconbtn" data-act="theme" aria-label="Switch to ${currentDark()?"light":"dark"} mode">${currentDark()?ICON.sun:ICON.moon}</button>`;
   const header = `<header class="top"><div class="wrap"><div class="brand"><img class="wm wm-light" src="icons/wordmark.png?v=${APP_VERSION}" alt="RCI Security"><img class="wm wm-dark" src="icons/wordmark-dark.png?v=${APP_VERSION}" alt="RCI Security"></div>${themeBtn}
-    ${S.me ? `<button class="iconbtn" data-act="tab" data-view="profile" aria-label="My Profile" style="padding:0;overflow:hidden;border:none;width:50px;height:50px">${avatar(myProfile() || {fullName:S.me.name, email:S.me.emails[0]}, "sm")}</button>` : ""}</div></header>`;
+    ${S.me ? (() => { const n = S.phase === "ready" ? pendingCount() : 0; return `<button class="iconbtn me-btn" data-act="tab" data-view="profile" aria-label="My Profile${n ? `, ${n} pending request${n > 1 ? "s" : ""}` : ""}">${avatar(myProfile() || {fullName:S.me.name, email:S.me.emails[0]}, "sm")}${n ? '<span class="red-dot" aria-hidden="true"></span>' : ""}</button>`; })() : ""}</div></header>`;
   if (S.phase !== "ready"){
     let body = "";
     if (S.phase === "boot") body = `<div class="center-screen"><span class="spinner" role="status" aria-label="Loading"></span><p>Loading the schedule…</p></div>`;
