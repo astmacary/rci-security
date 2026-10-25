@@ -136,7 +136,7 @@ a.btn{text-decoration:none}
 .line-name b{font-size:14.5px;line-height:1.2;max-width:100%;overflow:hidden;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .line-name .pill,.line-sub .pill{font-size:10px;padding:1px 6px}
 .admin-line select{min-width:0;padding:4px 8px;min-height:32px;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px}
-.line-main select{flex:0 1 118px;width:118px}
+.line-main select{flex:0 1 140px;width:140px}
 .line-btns{display:flex;gap:4px;flex:none}
 .line-btns .iconbtn{width:28px;height:28px}
 .line-btns .iconbtn svg{width:14px;height:14px}
@@ -148,6 +148,21 @@ a.btn{text-decoration:none}
 .admin-line.locked .line-who .av{opacity:.7}
 .admin-line .del-ask{flex-direction:column;align-items:stretch;gap:6px;font-size:13px;background:var(--bad-soft);border-radius:8px;padding:8px}
 .admin-line .del-ask .btn{justify-content:center;padding:6px 8px}
+/* Larger for editing on phones */
+.admin-row.admin-line{padding:12px 14px;gap:10px}
+.line-main{gap:10px}
+.line-who{gap:10px}
+.line-who .av,.line-who .av.face{width:42px;height:42px;font-size:14px}
+.line-name b{font-size:16.5px}
+.line-name .pill,.line-sub .pill{font-size:11.5px;padding:2px 8px}
+.admin-line select{padding:8px 10px;min-height:44px;font-size:15.5px}
+.line-btns{gap:6px}
+.line-btns .iconbtn{width:38px;height:38px}
+.line-btns .iconbtn svg{width:18px;height:18px}
+.line-sub label > span{font-size:12.5px}
+.admin-line .del-ask{font-size:14.5px;padding:10px}
+.admin-line .del-ask .btn{padding:9px 10px;font-size:15px}
+
 /* Calendar roster: small photo left of each name */
 .daylist .row{align-items:center}
 .daylist .row .who{display:flex;align-items:center;gap:8px;min-width:0}
@@ -431,7 +446,7 @@ const CONFIG = {
 
 const onAppHost = !CONFIG.appHosts || CONFIG.appHosts.some(h => h.startsWith(".") ? location.hostname.endsWith(h) : location.hostname === h);
 // Bump together with CACHE in sw.js whenever the app changes.
-const APP_VERSION = "30";
+const APP_VERSION = "31";
 const DEMO = !CONFIG.clientId || /[?&]demo\b/.test(location.search) || !onAppHost;
 const SCOPES = ["User.Read", "User.ReadBasic.All", "Sites.ReadWrite.All"];
 
@@ -1606,13 +1621,14 @@ document.addEventListener("submit", async e => {
     const placement = e.target.querySelector('[data-f="Placement"]').value;
     const btn = e.target.querySelector('button[type="submit"]');
     if (placement === item.role){ btn.disabled = true; return; }
-    // Like the Productions app: a changed placement goes back to Pending, so the person confirms again.
+    // Choosing a placement confirms it (Status Accepted); clearing it sets Status back to Pending.
+    const newStatus = filled(placement) ? "Accepted" : "Pending";
     const fields = { Placement: placement || null };
-    if (lc(item.status) !== "pending") fields.Status = "Pending";
+    if (item.status !== newStatus) fields.Status = newStatus;
     btn.disabled = true; btn.classList.add("busy");
     try {
       await API.update(item.id, fields);
-      item.role = placement; item.status = "Pending";
+      item.role = placement; item.status = newStatus;
       S.adminUnlocked?.delete(item.id);
       toast(`Saved: ${item.fullName}, ${placement || "no placement"}, ${fmtShort(item.date)}`); render(); updateBadge();
     } catch(err){ toast("Couldn't save the change. " + err.message, true); btn.disabled = false; btn.classList.remove("busy"); }
