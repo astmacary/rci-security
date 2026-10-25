@@ -446,7 +446,7 @@ const CONFIG = {
 
 const onAppHost = !CONFIG.appHosts || CONFIG.appHosts.some(h => h.startsWith(".") ? location.hostname.endsWith(h) : location.hostname === h);
 // Bump together with CACHE in sw.js whenever the app changes.
-const APP_VERSION = "31";
+const APP_VERSION = "32";
 const DEMO = !CONFIG.clientId || /[?&]demo\b/.test(location.search) || !onAppHost;
 const SCOPES = ["User.Read", "User.ReadBasic.All", "Sites.ReadWrite.All"];
 
@@ -1621,14 +1621,13 @@ document.addEventListener("submit", async e => {
     const placement = e.target.querySelector('[data-f="Placement"]').value;
     const btn = e.target.querySelector('button[type="submit"]');
     if (placement === item.role){ btn.disabled = true; return; }
-    // Choosing a placement confirms it (Status Accepted); clearing it sets Status back to Pending.
-    const newStatus = filled(placement) ? "Accepted" : "Pending";
+    // Like the Productions app: a changed placement goes back to Pending, so the person confirms again.
     const fields = { Placement: placement || null };
-    if (item.status !== newStatus) fields.Status = newStatus;
+    if (lc(item.status) !== "pending") fields.Status = "Pending";
     btn.disabled = true; btn.classList.add("busy");
     try {
       await API.update(item.id, fields);
-      item.role = placement; item.status = newStatus;
+      item.role = placement; item.status = "Pending";
       S.adminUnlocked?.delete(item.id);
       toast(`Saved: ${item.fullName}, ${placement || "no placement"}, ${fmtShort(item.date)}`); render(); updateBadge();
     } catch(err){ toast("Couldn't save the change. " + err.message, true); btn.disabled = false; btn.classList.remove("busy"); }
