@@ -2446,7 +2446,7 @@ async function siteUserId(email){
 /* Onboarding uses the signed-in leader's delegated permissions. No service keys. */
 const Onboarding = {
   field: null, schemaError: '', details: new Map(), busy: new Set(), identities: new Map(),
-  invitationMessage(){ return "Welcome to the RCI Security team!\n\nYou’ve been invited to use our team app to view your schedule, respond to serving requests, and stay connected.\n\nTo get started:\n\n1. Accept this invitation using the acceptance button or link in this email.\n2. Sign in with the same email address that received this invitation.\n3. Open the RCI Security app:\n   https://astmacary.github.io/rci-security/?install\n4. Follow the instructions to add the app to your device’s home screen.\n\nOnce you’ve accepted the invitation and signed in, your onboarding will complete automatically.\n\nIf you need help, contact your team leader. We’re glad to serve alongside you!"; },
+  invitationMessage(){ return "Welcome to the RCI Security team!\n\nAccept this invitation, then sign in with the email address that received it.\n\nOpen the team app to view your schedule, respond to serving requests, and stay connected:\nhttps://astmacary.github.io/rci-security/?install\n\nFollow the instructions to add the app to your home screen. Your setup will finish after you accept and sign in. For help, contact your team leader."; },
   siteUrl(){ return `https://${CONFIG.siteHost}${CONFIG.sitePath}`; },
   email(p){ return (p.pendingEmail || p.email || '').trim().toLowerCase(); },
   writable(p){ return isProfile(p) && p.editable !== false && /^\d+$/.test(String(p.id)); },
